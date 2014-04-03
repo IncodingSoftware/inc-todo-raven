@@ -1,0 +1,57 @@
+﻿@using Incoding.Extensions
+@model TodoFooterTmplVm
+
+@using (var template = Html.Incoding().Template<FooterVm>())
+{
+    <footer id="footer">
+        @using (var each = template.ForEach())
+        {
+            <span id="todo-count">
+                <strong>@each.For(r => r.AllCount)</strong>                
+            </span>
+            <ul id="filters">                
+                @{ const string classSelected = "selected"; }                
+                <li>
+                    @Html.Todo().LiHash(setting =>
+                                            {
+                                                setting.IsFirst = true;
+                                                setting.SelectedClass = classSelected;
+                                                setting.Type = GetTodoByClientQuery.TypeOfTodo.All;
+                                            })                    
+                </li>
+                <li>
+                    @Html.Todo().LiHash(setting =>
+                                            {
+                                                setting.SelectedClass = classSelected;
+                                                setting.Type = GetTodoByClientQuery.TypeOfTodo.Active;
+                                            })                    
+                </li>
+                <li>
+                    @Html.Todo().LiHash(setting =>
+                                            {
+                                                setting.SelectedClass = classSelected;
+                                                setting.Type = GetTodoByClientQuery.TypeOfTodo.Completed;
+                                            })      
+                </li>              
+            </ul>
+      
+            using (each.Is(r => r.IsCompleted))
+            {
+                @Html.Todo().Verb(setting =>
+                                      {
+                                          setting.Url = Url.Dispatcher().Push(new ClearCompletedCommand
+                                                                                  {
+                                                                                          ClientId = Selector.Incoding.Cookie(CookieManager.ClientId)
+                                                                                  });
+                                          setting.OnSuccess = dsl => dsl.WithId(Model.ContainerId).Core().Trigger.Incoding();
+                                          setting.Attr = new { id = "clear-completed", @class = each.NotInline(r => r.IsCompleted, "ng-hide") };
+                                          setting.Content = "Clear completed (" + each.For(r => r.CompletedCount) + ")";
+                                      })       
+            }
+        }
+    </footer>
+}
+
+
+
+ 

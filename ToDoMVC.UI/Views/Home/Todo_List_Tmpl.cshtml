@@ -1,0 +1,123 @@
+﻿@model GetTodoByClientQuery.Tmpl
+@using Incoding.CQRS
+@{
+    var toggleAllId = "toggle-all";
+}
+@using (var template = Html.Incoding().Template<GetTodoByClientQuery.Response>())
+{    
+    <section id="main">
+        @(Html.When(JqueryBind.None)
+              .Do()
+              .Direct()
+              .OnSuccess(dsl => dsl.Self().Behaviors(inDsl =>
+                                                         {
+                                                             inDsl.Core().JQuery.Attributes.RemoveAttr(HtmlAttribute.Checked);
+                                                             inDsl.Core().JQuery.Attributes.SetAttr(HtmlAttribute.Checked)
+                                                                  .If(r => r.Is(() => Selector.Jquery.Class("toggle").Is(JqueryExpression.Checked)));
+                                                         }))
+              .When(JqueryBind.Click)
+              .Do()
+              .Direct()
+              .OnSuccess(dsl =>
+                             {
+                                 dsl.WithClass("toggle")
+                                    .Behaviors(inDsl =>
+                                                   {
+                                                       inDsl.Core().JQuery.Attributes.RemoveAttr(HtmlAttribute.Checked);
+                                                       inDsl.Core().JQuery.Attributes.SetAttr(HtmlAttribute.Checked)
+                                                            .If(builder => builder.Is(() => Selector.Jquery.Self()));
+                                                       inDsl.Core().Trigger.Change();
+                                                   });
+                                 dsl.WithId(Model.FooterId).Core().Trigger.Incoding();
+                             })
+              .AsHtmlAttributes(new { id = toggleAllId })
+              .ToCheckBox(false))
+                  
+        <ul id="todo-list">
+            @using (var each = template.ForEach())
+            {
+                var labelId = "label" + each.For(r => r.Id);
+                var inputId = "input" + each.For(r => r.Id);
+                Func<bool, MvcHtmlString> createCheckBox = isValue => Html.When(JqueryBind.Change)
+                                                                          .Do()
+                                                                          .AjaxPost(Url.Dispatcher().Push(new ToggleTodoCommand
+                                                                                                              {
+                                                                                                                      Id = each.For(r => r.Id)
+                                                                                                              }))
+                                                                          .OnBegin(dsl =>
+                                                                                       {
+                                                                                           dsl.WithSelf(r => r.Closest(HtmlTag.Li))
+                                                                                              .Behaviors(inDsl =>
+                                                                                                             {
+                                                                                                                 inDsl.Core().JQuery.Attributes.RemoveClass("completed");
+                                                                                                                 inDsl.Core().JQuery.Attributes.AddClass("completed")
+                                                                                                                      .If(builder => builder.Is(() => Selector.Jquery.Self()));
+                                                                                                             });
+
+                                                                                           dsl.WithId(Model.FooterId).Core().Trigger.Incoding();
+                                                                                           dsl.WithId(toggleAllId).Core().Trigger.None();
+                                                                                           
+                                                                                       })
+                                                                          .AsHtmlAttributes(new {@class="toggle" })
+                                                                          .ToCheckBox(isValue);
+                <li class="@each.IsInline(r=>r.Active,"completed")">
+                    <div class="view">
+                        @using (each.Is(r => r.Active))
+                        {
+                            @createCheckBox(true)
+                        }
+                        @using (each.Not(r => r.Active))
+                        {
+                            @createCheckBox(false)
+                        }
+                                        
+                        @using (Html.When("dblclick")
+                                    .Do()
+                                    .Direct()
+                                    .OnSuccess(dsl =>
+                                                   {
+                                                       dsl.WithSelf(r => r.Closest(HtmlTag.Li)).Core().JQuery.Attributes.ToggleClass("editing");
+                                                       dsl.WithId(inputId).Core().Trigger.Invoke(JqueryBind.Focus);
+                                                   })
+                                    .AsHtmlAttributes(new {id = labelId})
+                                    .ToBeginTag(Html, HtmlTag.Label))
+                        {
+                            @each.For(r => r.Title)
+                        }                        
+                   
+                        @Html.Todo().Verb(setting =>
+                                              {
+                                                  setting.Url = Url.Dispatcher().Push(new DeleteEntityByIdCommand
+                                                                                          {
+                                                                                                  Id = each.For(r => r.Id),
+                                                                                                  AssemblyQualifiedName = typeof(Todo).AssemblyQualifiedName
+                                                                                          });
+                                                  setting.OnBegin = dsl =>
+                                                                        {
+                                                                            dsl.WithSelf(s => s.Closest(HtmlTag.Li)).Core().JQuery.Manipulation.Remove();
+                                                                            dsl.WithId(Model.FooterId).Core().Trigger.Incoding();
+                                                                            dsl.WithId(toggleAllId).Core().Trigger.None();
+                                                                        };
+                                                  setting.Attr = new { @class = "destroy" };
+                                              })                                                                                            
+                    </div>
+                    @(Html.When(JqueryBind.Blur)
+                          .Do()
+                          .AjaxPost(Url.Dispatcher().Push(new EditTodoCommand
+                                                              {
+                                                                      Id = each.For(r => r.Id),
+                                                                      Title = Selector.Jquery.Self()
+                                                              }))
+                          .OnSuccess(dsl =>
+                                         {
+                                             dsl.WithSelf(r => r.Closest(HtmlTag.Li)).Core().JQuery.Attributes.ToggleClass("editing");
+                                             dsl.WithId(labelId).Core().JQuery.Manipulation.Text(Selector.Jquery.Self());
+                                         })
+                          .AsHtmlAttributes(new { @class = "edit",id = inputId })
+                          .ToInput(HtmlInputType.Text, each.For(r => r.Title)))    
+                </li>
+            }     
+        </ul>   
+    </section>    
+
+}

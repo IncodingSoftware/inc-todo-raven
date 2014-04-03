@@ -1,0 +1,73 @@
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+@model AddTodoCommand
+<body class="learn-bar">
+    @Html.Partial("LearnPanel")
+    <section id="todoapp" >
+        @{
+            string containerId = Guid.NewGuid().ToString();
+            string footerId = Guid.NewGuid().ToString();
+        }        
+        
+        <header id="header">
+            <h1>todos</h1>        
+            @using (Html.Todo().BeginForm<AddTodoCommand>(setting =>
+                                         {
+                                             setting.TargetId = containerId;
+                                             setting.Routes = new
+                                                                  {
+                                                                          ClientId = Selector.Incoding.Cookie(CookieManager.ClientId)
+                                                                  };
+                                         }))
+            {
+                @Html.TextBoxFor(r => r.Title, new { placeholder = "What needs to be done?", autofocus = "" })
+            }
+        </header>
+
+        @Html.Todo().Container(setting =>
+                     {
+                         setting.Id = containerId;
+                         setting.Url = Url.Dispatcher()
+                                          .Query<GetTodoByClientQuery>(new
+                                                        {
+                                                                ClientId = Selector.Incoding.Cookie(CookieManager.ClientId),
+                                                                Type = Selector.Incoding.HashQueryString<GetTodoByClientQuery>(r => r.Type)
+                                                        })
+                                          .AsJson();
+                         setting.Tmpl = Url.Dispatcher()
+                                           .Model(new GetTodoByClientQuery.Tmpl { FooterId = footerId })
+                                           .AsView("~/Views/Home/Todo_List_Tmpl.cshtml");
+                         setting.DependencyId = footerId;
+                     })
+                               
+        @(Html.When(JqueryBind.None)
+              .Do()
+              .Direct(IncodingResult.Success(new FooterVm
+                                                 {
+                                                         AllCount = Selector.Jquery.Class("toggle").Length(),
+                                                         IsCompleted = Selector.Jquery.Class("toggle").Is(JqueryExpression.Checked),
+                                                         CompletedCount = Selector.Jquery.Class("toggle")
+                                                                                  .Expression(JqueryExpression.Checked)
+                                                                                  .Length(),
+                                                 }))
+              .OnSuccess(dsl =>
+                             {
+                                 string urlTmpl = Url.Dispatcher()
+                                                     .Model(new TodoFooterTmplVm
+                                                                {
+                                                                        ContainerId = containerId
+                                                                })
+                                                     .AsView("~/Views/Home/Todo_Footer_Tmpl.cshtml");
+                                 dsl.Self().Core().Insert.Prepare().WithTemplateByUrl(urlTmpl).Html();
+                             })
+              .AsHtmlAttributes(new { id = footerId })
+              .ToDiv())  
+    </section>
+    <footer id="info">
+        <p>Double-click to edit a todo</p>
+        <p>Credits:
+            <a href="https://www.facebook.com/wlad.kopachinsky">Vlad Kopachinsky</a>,            
+        </p>        
+    </footer>
+</body>
